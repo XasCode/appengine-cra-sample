@@ -7,6 +7,9 @@ steps:
   args: ['run', 'build']
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: 'bash'
-  args: ['-c', 'cd build && gcloud app deploy']
+  args: ['-c', 'cd build && gcloud app deploy --appyaml=../app.yaml ${_PROMO} --version=${_VERSION}']
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: 'bash'
+  args: ['-c', 'cd build && gcloud app versions list --format="value(version.id)" --sort-by="~version.createTime" | tail -n +3 | xargs -r gcloud app versions delete --quiet']
 options:
   logging: CLOUD_LOGGING_ONLY
