@@ -1,3 +1,5 @@
+options:
+  logging: CLOUD_LOGGING_ONLY
 steps:
 - name: 'node'
   entrypoint: 'npm'
@@ -7,9 +9,19 @@ steps:
   args: ['run', 'build']
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: 'bash'
-  args: ['-c', 'cd build && gcloud app deploy --appyaml=../app.yaml ${_PROMO} --version=${_VERSION}']
+  args: ['-c', 'cd build && gcloud app versions list --format="value(version.id)" --sort-by="~version.createTime" | tail -n +3 | xargs -r gcloud app versions delete --quiet']
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: 'bash'
-  args: ['-c', 'cd build && gcloud app versions list --format="value(version.id)" --sort-by="~version.createTime" | tail -n +3 | xargs -r gcloud app versions delete --quiet']
-options:
-  logging: CLOUD_LOGGING_ONLY
+  args:
+  - '-c'
+  - |
+    cd build
+    if [ "${_VERSION}" == "cnry" ] && [ `gcloud app versions list --format="value(version.id)" --sort-by="~version.id" | grep -i "prod" | wc -l` -gt 0 ]; then
+      gcloud app deploy --appyaml=../app.yaml --no-promote --version=${_VERSION}
+      gcloud app services set-traffic default --splits=prod=.6,cnry=.4 --split-by=random
+    elif [ "${_VERSION}" == "prod" ] && [ `gcloud app versions list --format="value(version.id)" --sort-by="~version.id" | grep -i "cnry" | wc -l` -gt 0 ]; then
+      gcloud app deploy --appyaml=../app.yaml --no-promote --version=${_VERSION}
+      gcloud app services set-traffic default --splits=prod=.6,cnry=.4 --split-by=random
+    else
+      gcloud app deploy --appyaml=../app.yaml --promote --version=${_VERSION}
+    fi
